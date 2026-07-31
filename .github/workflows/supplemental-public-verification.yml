@@ -1,0 +1,166 @@
+name: Supplemental public verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supplemental-public-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  openmp:
+    name: OpenMP build and smoke
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake python3
+
+      - name: Configure OpenMP build
+        run: |
+          cmake \
+            -S . \
+            -B build-openmp \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DAP_MESH_USE_MPI=OFF \
+            -DAP_MESH_USE_OPENMP=ON \
+            -DAP_MESH_ENABLE_LTO=OFF
+
+      - name: Verify OpenMP compiler activation
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          database = json.loads(Path('build-openmp/compile_commands.json').read_text())
+          commands = []
+          for entry in database:
+              if 'command' in entry:
+                  commands.append(entry['command'])
+              else:
+                  commands.append(' '.join(entry.get('arguments', [])))
+          if not any('-fopenmp' in command for command in commands):
+              raise SystemExit('OpenMP was requested but -fopenmp is absent from compile_commands.json')
+          print('OpenMP compiler activation verified.')
+          PY
+
+      - name: Build and test OpenMP configuration
+        run: |
+          cmake --build build-openmp --parallel 2
+          ctest --test-dir build-openmp --output-on-failure
+          AP_MESH_TEST_EXECUTABLE="${GITHUB_WORKSPACE}/build-openmp/bin/ap_mesh" \
+            python3 -m unittest tests.test_cli
+
+      - name: Run OpenMP Eistute smoke profile
+        run: |
+          bash scripts/run_case.sh \
+            --config configs/eistute/smoke.conf \
+            --results results/supplemental/openmp-eistute \
+            --executable "${GITHUB_WORKSPACE}/build-openmp/bin/ap_mesh" \
+            --verify "python3 scripts/verify_smoke.py Eistute configs/eistute/smoke.conf results/supplemental/openmp-eistute" \
+            --clean-results
+
+  container:
+    name: Docker build and maintained reproduction
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build container image
+        run: docker build --pull -f container/Dockerfile -t adaptive-nonmanifold-meshing:ci .
+
+      - name: Run maintained container reproduction
+        run: docker run --rm adaptive-nonmanifold-meshing:ci
+
+  source-package:
+    name: Source archive isolation and rebuild
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create and inspect source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="adaptive-nonmanifold-meshing-${GITHUB_SHA}.tar.gz"
+          prefix="adaptive-nonmanifold-meshing-${GITHUB_SHA}/"
+
+          git archive \
+            --format=tar.gz \
+            --prefix="${prefix}" \
+            --output="${package}" \
+            HEAD
+
+          sha256sum "${package}" | tee source-package.sha256
+          tar -tzf "${package}" > source-package-contents.txt
+
+          if grep -E '(^|/)(paper|study)/' source-package-contents.txt; then
+            echo 'Forbidden private research/editorial tree found in source archive.' >&2
+            exit 1
+          fi
+
+          if grep -E '(^|/)\.git(/|$)' source-package-contents.txt; then
+            echo 'Git metadata found in source archive.' >&2
+            exit 1
+          fi
+
+          mkdir package-root
+          tar -xzf "${package}" -C package-root
+          test -f "package-root/${prefix}CMakeLists.txt"
+
+      - name: Build and test extracted source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_root="package-root/adaptive-nonmanifold-meshing-${GITHUB_SHA}"
+
+          cmake \
+            -S "${source_root}" \
+            -B build-package \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DAP_MESH_USE_MPI=OFF \
+            -DAP_MESH_USE_OPENMP=OFF \
+            -DAP_MESH_ENABLE_LTO=OFF
+
+          cmake --build build-package --parallel 2
+          ctest --test-dir build-package --output-on-failure
+
+          (
+            cd "${source_root}"
+            AP_MESH_TEST_EXECUTABLE="${GITHUB_WORKSPACE}/build-package/bin/ap_mesh" \
+              python3 -m unittest tests.test_cli
+          )
+
+      - name: Record package summary
+        shell: bash
+        run: |
+          {
+            echo '# Supplemental source-package verification'
+            echo
+            echo '- Source archive created from the exact Git commit.'
+            echo '- No paper/, study/, or .git tree was present.'
+            echo '- Extracted archive configured, built, and passed CTest and CLI tests.'
+            echo
+            echo '```text'
+            cat source-package.sha256
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
