@@ -1,0 +1,13 @@
+.git
+.github
+build
+build-*
+results
+*.o
+*.exe
+*.log
+__pycache__
+*.py[cod]
+.vscode
+.idea
+.DS_Store

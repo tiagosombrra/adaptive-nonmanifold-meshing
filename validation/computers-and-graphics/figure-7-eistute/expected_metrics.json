@@ -1,0 +1,12 @@
+{
+  "validation_id": "computers-and-graphics-figure-7-eistute-stage-4",
+  "software": "Adaptive Non-Manifold Meshing",
+  "model": "Eistute",
+  "adaptive_stage": 4,
+  "triangles": 7184,
+  "normalized_error": 0.036712,
+  "error_reduction_percent": 96.3288,
+  "quality_q_ge_0_60_percent": 58.6303,
+  "mean_shared_curve_compatibility_error": 0.0,
+  "role": "published_validation"
+}

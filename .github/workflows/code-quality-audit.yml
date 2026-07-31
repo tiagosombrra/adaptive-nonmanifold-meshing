@@ -1,0 +1,211 @@
+name: Code quality audit
+
+on:
+  push:
+    branches:
+      - main
+      - osp-preparation
+  pull_request:
+    branches:
+      - main
+      - osp-preparation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-quality-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: cpp-code-quality-audit
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install analysis dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            clang-format \
+            cmake \
+            cppcheck \
+            python3
+
+      - name: Prepare report directory
+        run: mkdir -p reports
+
+      - name: Validate audit scripts
+        run: |
+          python3 -m py_compile \
+            scripts/source_audit.py \
+            scripts/summarize_cppcheck.py
+
+      - name: Generate source inventory
+        run: |
+          python3 scripts/source_audit.py \
+            --json reports/source-audit.json \
+            --markdown reports/source-audit.md
+
+      - name: Configure warning-enabled build
+        run: |
+          cmake \
+            -S . \
+            -B build-audit \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DAP_MESH_USE_MPI=OFF \
+            -DAP_MESH_USE_OPENMP=OFF \
+            -DAP_MESH_ENABLE_LTO=OFF \
+            -DAP_MESH_ENABLE_WARNINGS=ON \
+            -DAP_MESH_WARNINGS_AS_ERRORS=ON
+
+      - name: Build and capture compiler diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --build build-audit --parallel 2 2>&1 \
+            | tee reports/compiler-build.log
+          grep -E 'warning:|error:' reports/compiler-build.log \
+            > reports/compiler-diagnostics.txt || true
+          test ! -s reports/compiler-diagnostics.txt
+
+      - name: Run cppcheck
+        shell: bash
+        run: |
+          cppcheck \
+            --project=build-audit/compile_commands.json \
+            --enable=warning,style,performance,portability \
+            --inconclusive \
+            --std=c++17 \
+            --suppress=missingIncludeSystem \
+            --suppressions-list=scripts/cppcheck-suppressions.txt \
+            --xml \
+            --xml-version=2 \
+            2> reports/cppcheck.xml || true
+
+          cppcheck \
+            --project=build-audit/compile_commands.json \
+            --enable=warning,style,performance,portability \
+            --inconclusive \
+            --std=c++17 \
+            --suppress=missingIncludeSystem \
+            --suppressions-list=scripts/cppcheck-suppressions.txt \
+            --template='{severity}:{id}:{file}:{line}: {message}' \
+            2> reports/cppcheck.txt || true
+
+          python3 scripts/summarize_cppcheck.py \
+            reports/cppcheck.xml \
+            reports/cppcheck-summary.md \
+            reports/cppcheck-summary.json
+
+      - name: Audit clang-format compatibility
+        shell: bash
+        run: |
+          : > reports/clang-format-files.txt
+          while IFS= read -r -d '' file; do
+            if ! clang-format --dry-run --Werror "$file" >/dev/null 2>&1; then
+              echo "$file" >> reports/clang-format-files.txt
+            fi
+          done < <(
+            find src include -type f \
+              \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' \
+                 -o -name '*.h' -o -name '*.hh' -o -name '*.hpp' -o -name '*.hxx' \) \
+              -print0
+          )
+
+      - name: Verify archived scientific reference
+        run: python3 scripts/verify_reference.py
+
+      - name: Create execution summary
+        shell: bash
+        run: |
+          compiler_count="$(wc -l < reports/compiler-diagnostics.txt)"
+          format_count="$(wc -l < reports/clang-format-files.txt)"
+          {
+            echo '# Code-quality audit execution'
+            echo
+            echo "- Compiler diagnostic lines: ${compiler_count}"
+            echo "- Files differing from default clang-format: ${format_count}"
+            echo '- Archived Eistute reference verification: passed'
+          } > reports/execution-summary.md
+
+          cat reports/execution-summary.md >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          cat reports/source-audit.md >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          cat reports/cppcheck-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: cpp-code-quality-audit
+          path: |
+            reports/
+            build-audit/compile_commands.json
+          if-no-files-found: error
+          retention-days: 30
+
+  sanitizers-and-smoke:
+    name: sanitizers-and-smoke
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake python3
+
+      - name: Configure sanitizer build
+        run: |
+          cmake \
+            -S . \
+            -B build-sanitizers \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DAP_MESH_USE_MPI=OFF \
+            -DAP_MESH_USE_OPENMP=OFF \
+            -DAP_MESH_ENABLE_LTO=OFF \
+            -DAP_MESH_ENABLE_WARNINGS=OFF \
+            -DAP_MESH_ENABLE_SANITIZERS=ON
+
+      - name: Build and test sanitizer configuration
+        run: |
+          cmake --build build-sanitizers --parallel 2
+          ctest --test-dir build-sanitizers --output-on-failure
+          AP_MESH_TEST_EXECUTABLE="${GITHUB_WORKSPACE}/build-sanitizers/bin/ap_mesh" \
+            python3 -m unittest tests.test_cli
+
+      - name: Run maintained sanitizer smoke profiles
+        run: |
+          bash scripts/run_case.sh \
+            --config configs/book/smoke.conf \
+            --results results/smoke/book \
+            --executable "${GITHUB_WORKSPACE}/build-sanitizers/bin/ap_mesh" \
+            --verify "python3 scripts/verify_smoke.py Book configs/book/smoke.conf results/smoke/book" \
+            --clean-results
+          bash scripts/run_case.sh \
+            --config configs/decor_shelf/smoke.conf \
+            --results results/smoke/decor_shelf \
+            --executable "${GITHUB_WORKSPACE}/build-sanitizers/bin/ap_mesh" \
+            --verify "python3 scripts/verify_smoke.py Decor-Shelf configs/decor_shelf/smoke.conf results/smoke/decor_shelf" \
+            --clean-results
+          bash scripts/run_case.sh \
+            --config configs/eistute/smoke.conf \
+            --results results/smoke/eistute \
+            --executable "${GITHUB_WORKSPACE}/build-sanitizers/bin/ap_mesh" \
+            --verify "python3 scripts/verify_smoke.py Eistute configs/eistute/smoke.conf results/smoke/eistute" \
+            --clean-results

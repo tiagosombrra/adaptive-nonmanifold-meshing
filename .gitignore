@@ -1,0 +1,17 @@
+/build/
+/build-*/
+/cmake-build-*/
+/.cache/
+/.vscode/
+/.idea/
+*.user
+*.suo
+*.swp
+*.tmp
+*.log
+__pycache__/
+*.py[cod]
+/results/
+/docker-results/
+*.obj
+!reference/**/*.obj

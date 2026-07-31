@@ -1,0 +1,39 @@
+GRSI TESTED ENVIRONMENT
+=======================
+
+Generated: 2026-07-20 21:29:43 -03:00
+Repository commit: a4d943dc64191c419eb6efcb2656e3ee76a8f5f0
+
+Operating system:
+Microsoft Windows 11 Home 10.0.26200 64 bits
+
+CPU:
+Intel(R) Pentium(R) Gold G5420T CPU @ 3.20GHz
+
+Physical memory:
+15.81 GiB
+
+CMake:
+cmake version 4.2.0-rc1
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).
+
+C++ compiler:
+g++.exe (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders, r8) 13.2.0
+Copyright (C) 2023 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Build tool:
+GNU Make 4.4.1
+Built for x86_64-w64-mingw32
+Copyright (C) 1988-2023 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Python:
+Python 3.12.10
+
+Representative script:
+reproduce_eistute_windows.bat

@@ -1,0 +1,49 @@
+cff-version: 1.2.0
+message: >-
+  Please cite this software and the associated Computers & Graphics article
+  when using Adaptive Non-Manifold Meshing.
+title: "Adaptive Non-Manifold Meshing"
+type: software
+authors:
+  - given-names: "Tiago Guimaraes"
+    family-names: "Sombra"
+    affiliation: "Universidade Federal do Ceara"
+    orcid: "https://orcid.org/0000-0002-0020-1203"
+  - given-names: "Joaquim Bento"
+    family-names: "Cavalcante-Neto"
+    affiliation: "Universidade Federal do Ceara"
+    orcid: "https://orcid.org/0000-0003-1143-6662"
+  - given-names: "Creto Augusto"
+    family-names: "Vidal"
+    affiliation: "Universidade Federal do Ceara"
+    orcid: "https://orcid.org/0000-0002-0857-6333"
+repository-code: "https://github.com/tiagosombrra/adaptive-nonmanifold-meshing"
+url: "https://github.com/tiagosombrra/adaptive-nonmanifold-meshing"
+license: "MIT"
+version: "1.0.0"
+date-released: "2026-07-28"
+abstract: >-
+  A C++17 application for compatibility-preserving adaptive triangular meshing
+  of non-manifold parametric patch complexes with shared curves.
+keywords:
+  - "adaptive meshing"
+  - "non-manifold surfaces"
+  - "parametric patches"
+  - "shared-curve compatibility"
+  - "surface meshing"
+  - "computational geometry"
+preferred-citation:
+  type: article
+  title: >-
+    Adaptive Meshing of Non-Manifold Parametric Patch Complexes with
+    Shared-Curve Compatibility
+  authors:
+    - given-names: "Tiago Guimaraes"
+      family-names: "Sombra"
+    - given-names: "Joaquim Bento"
+      family-names: "Cavalcante-Neto"
+    - given-names: "Creto Augusto"
+      family-names: "Vidal"
+  journal: "Computers & Graphics"
+  year: 2026
+  doi: "10.1016/j.cag.2026.104707"
