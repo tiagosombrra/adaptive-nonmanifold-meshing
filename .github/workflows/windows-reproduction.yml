@@ -24,11 +24,11 @@ jobs:
             git
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-python
-            make
       - name: Configure, build, and test
         shell: msys2 {0}
         run: |
-          cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DAP_MESH_USE_MPI=OFF -DAP_MESH_USE_OPENMP=OFF
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DAP_MESH_USE_MPI=OFF -DAP_MESH_USE_OPENMP=OFF
           cmake --build build --parallel 2
           ctest --test-dir build --output-on-failure
