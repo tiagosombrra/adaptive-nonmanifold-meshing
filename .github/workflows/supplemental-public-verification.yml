@@ -68,9 +68,9 @@ jobs:
         run: |
           bash scripts/run_case.sh \
             --config configs/eistute/smoke.conf \
-            --results results/supplemental/openmp-eistute \
+            --results results/smoke/eistute \
             --executable "${GITHUB_WORKSPACE}/build-openmp/bin/ap_mesh" \
-            --verify "python3 scripts/verify_smoke.py Eistute configs/eistute/smoke.conf results/supplemental/openmp-eistute" \
+            --verify "python3 scripts/verify_smoke.py Eistute configs/eistute/smoke.conf results/smoke/eistute" \
             --clean-results
 
   container:
