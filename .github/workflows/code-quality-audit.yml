@@ -2,13 +2,9 @@ name: Code quality audit
 
 on:
   push:
-    branches:
-      - main
-      - osp-preparation
+    branches: [main]
   pull_request:
-    branches:
-      - main
-      - osp-preparation
+    branches: [main]
   workflow_dispatch:
 
 permissions:

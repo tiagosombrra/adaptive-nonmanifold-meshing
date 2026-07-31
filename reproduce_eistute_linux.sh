@@ -9,8 +9,8 @@ echo "Adaptive non-manifold meshing — representative reproduction"
 echo "Computers & Graphics Figure 7 — Eistute model"
 echo "============================================================"
 
-./scripts/build_linux.sh
-./scripts/run_eistute_linux.sh
+bash ./scripts/build_linux.sh
+bash ./scripts/run_eistute_linux.sh
 
 echo
 echo "Representative Eistute result reproduced successfully."
